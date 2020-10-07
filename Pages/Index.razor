@@ -13,6 +13,7 @@
     <h2>GravityBoxGame @(victories == 0 ? "" : " - " + victories + (victories == 1 ? " victory!" : " victories!"))</h2>
     Use Arrows (Up, Down, Right, Left) to control the blue box or use touch or cursor.<br />
     And press Space to restart.<br />
+    <button @onclick="() => Focus()">Focus game for keyboard use.</button>
 </div>
 
 @code {
@@ -30,14 +31,6 @@
 
     protected bool mouseDown { get; set; }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            await Focus();
-        }
-    }
-
     public void TouchStart(TouchEventArgs touchEventArgs)
     {
         mouseDown = true;
@@ -47,10 +40,9 @@
         }
     }
 
-    public async Task TouchEnd(TouchEventArgs touchEventArgs)
+    public void TouchEnd(TouchEventArgs touchEventArgs)
     {
         mouseDown = false;
-        await Focus();
     }
 
     public void TouchMove(TouchEventArgs touchEventArgs)
@@ -67,10 +59,9 @@
         Move(mouseEventArgs.ClientX, mouseEventArgs.ClientY);
     }
 
-    public async Task CursorUp(MouseEventArgs mouseEventArgs)
+    public void CursorUp(MouseEventArgs mouseEventArgs)
     {
         mouseDown = false;
-        await Focus();
     }
 
     public void CursorMove(MouseEventArgs mouseEventArgs)
