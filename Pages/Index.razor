@@ -1,0 +1,302 @@
+﻿@page "/"
+@using System.Globalization;
+@inject IJSRuntime JSRuntime
+
+<div>
+    <svg width="520" height="520" @onmousedown=CursorDown @onmousemove=CursorMove @onmouseup=CursorUp @ontouchstart=TouchStart @ontouchend=TouchEnd @ontouchmove=TouchMove >
+        @foreach (Shape shape in shapes)
+        {
+            <rect height=@shape.height.ToString(CultureInfo.InvariantCulture) width=@shape.width.ToString(CultureInfo.InvariantCulture) x=@shape.x.ToString(CultureInfo.InvariantCulture) y=@shape.y.ToString(CultureInfo.InvariantCulture) fill=@shape.color></rect>
+        }
+    </svg><br />
+    <input @onkeydown=KeyDown @onkeyup=KeyUp @ref=input style="width:0;height:0;" />
+    <h2>GravityBoxGame @(victories == 0 ? "" : " - " + victories + (victories == 1 ? " victory!" : " victories!"))</h2>
+    Use Arrows (Up, Down, Right, Left) to control the blue box or use touch or cursor.<br />
+    And press Space to restart.<br />
+</div>
+
+@code {
+    public const double DELTA = 0.00001;
+
+    protected List<Shape> shapes = new List<Shape>();
+
+    protected Shape player { get; set; }
+
+    protected ElementReference input { get; set; }
+
+    protected int victories { get; set; }
+
+    protected List<string> keys = new List<string>();
+
+    protected bool mouseDown { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Focus();
+        }
+    }
+
+    public void TouchStart(TouchEventArgs touchEventArgs)
+    {
+        mouseDown = true;
+        foreach (var point in touchEventArgs.Touches)
+        {
+            Move(point.ClientX, point.ClientX);
+        }
+    }
+
+    public async Task TouchEnd(TouchEventArgs touchEventArgs)
+    {
+        mouseDown = false;
+        await Focus();
+    }
+
+    public void TouchMove(TouchEventArgs touchEventArgs)
+    {
+        foreach (var point in touchEventArgs.Touches)
+        {
+            Move(point.ClientX, point.ClientX);
+        }
+    }
+
+    public void CursorDown(MouseEventArgs mouseEventArgs)
+    {
+        mouseDown = true;
+        Move(mouseEventArgs.ClientX, mouseEventArgs.ClientY);
+    }
+
+    public async Task CursorUp(MouseEventArgs mouseEventArgs)
+    {
+        mouseDown = false;
+        await Focus();
+    }
+
+    public void CursorMove(MouseEventArgs mouseEventArgs)
+    {
+        Move(mouseEventArgs.ClientX, mouseEventArgs.ClientY);
+    }
+
+    public void Move(double x, double y)
+    {
+        if (mouseDown)
+        {
+            if (y < player.y)
+            {
+                MoveUp();
+            }
+            else if (y > player.y + player.height)
+            {
+                MoveDown();
+            }
+            if (x < player.x)
+            {
+                MoveLeft();
+            }
+            else if (x > player.width + player.x)
+            {
+                MoveRight();
+            }
+        }
+    }
+
+    protected async Task Focus()
+    {
+        await JSRuntime.InvokeVoidAsync("window.BlazorFocusElement", input);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        shapes.Add(new Shape() { height = 20, width = 500, x = 0, y = 500 });
+        shapes.Add(new Shape() { height = 20, width = 500, x = 0, y = 0 });
+        shapes.Add(new Shape() { height = 500, width = 20, x = 0, y = 0 });
+        shapes.Add(new Shape() { height = 520, width = 20, x = 500, y = 0 });
+
+        shapes.Add(new Shape() { height = 160, width = 10, x = 420, y = 340 });
+        shapes.Add(new Shape() { height = 160, width = 10, x = 340, y = 260 });
+        shapes.Add(new Shape() { height = 160, width = 10, x = 260, y = 340 });
+        shapes.Add(new Shape() { height = 160, width = 10, x = 180, y = 260 });
+        shapes.Add(new Shape() { height = 160, width = 10, x = 100, y = 340 });
+
+        shapes.Add(new Shape() { height = 10, width = 400, x = 100, y = 250 });
+        shapes.Add(new Shape() { height = 10, width = 420, x = 0, y = 170 });
+
+        shapes.Add(new Shape() { height = 80, width = 10, x = 420, y = 100 });
+        shapes.Add(new Shape() { height = 100, width = 10, x = 340, y = 0 });
+        shapes.Add(new Shape() { height = 70, width = 10, x = 260, y = 100 });
+        shapes.Add(new Shape() { height = 100, width = 10, x = 180, y = 0 });
+        shapes.Add(new Shape() { height = 70, width = 10, x = 100, y = 100 });
+
+        shapes.Add(new Shape() { height = 70, width = 80, x = 20, y = 100, type = "VICTORY", color = "lightgreen" });
+
+        player = new Shape() { height = 50, width = 50, color = "blue" };
+        shapes.Add(player);
+        Restart();
+
+        await Task.Run(async () =>
+        {
+            while (true)
+            {
+                await Task.Delay(1);
+                var topCollisons = shapes.Where(s => s != player).Where(s =>
+                    s.y + DELTA > player.y + player.height &&
+                    s.x + s.width > player.x &&
+                    s.x < player.x + player.width &&
+                    s.y < player.y + player.speedY + player.height
+                ).ToList();
+                var bottomCollisons = shapes.Where(s => s != player).Where(s =>
+                    s.y + s.height < player.y + DELTA &&
+                    s.x + s.width > player.x &&
+                    s.x < player.x + player.width &&
+                    s.y + s.height > player.y + player.speedY
+                ).ToList();
+
+                var rightCollisons = shapes.Where(s => s != player).Where(s =>
+                    s.x + DELTA > player.x + player.width &&
+                    s.y + s.height > player.y &&
+                    s.y < player.y + player.height &&
+                    s.x < player.x + player.speedX + player.width
+                ).ToList();
+                var leftCollisons = shapes.Where(s => s != player).Where(s =>
+                    s.x + s.width < player.x + DELTA &&
+                    s.y + s.height > player.y &&
+                    s.y < player.y + player.height &&
+                    s.x + s.width > player.x + player.speedX
+                ).ToList();
+
+                if (topCollisons.Count() > 0)
+                {
+                    var coll = topCollisons.First();
+                    player.speedY = 0;
+                    player.y = coll.y - player.height;
+                    CheckWinningShape(coll);
+                }
+                else if (bottomCollisons.Count() > 0)
+                {
+                    var coll = bottomCollisons.First();
+                    player.speedY = 0;
+                    player.y = coll.y + coll.height;
+                    CheckWinningShape(coll);
+                }
+                else
+                {
+                    player.y += player.speedY;
+                }
+
+                if (rightCollisons.Count() > 0)
+                {
+                    var coll = rightCollisons.First();
+                    player.speedX = 0;
+                    player.x = coll.x - player.width;
+                    CheckWinningShape(coll);
+                }
+                else if (leftCollisons.Count() > 0)
+                {
+                    var coll = leftCollisons.First();
+                    player.speedX = 0;
+                    player.x = coll.x + coll.width;
+                    CheckWinningShape(coll);
+                }
+                else
+                {
+                    player.x += player.speedX;
+                    player.speedX *= 0.95;
+                }
+
+                player.speedY += 0.007;
+                StateHasChanged();
+            }
+        });
+    }
+
+    protected void CheckWinningShape(Shape shape)
+    {
+        if (shape.type == "VICTORY")
+        {
+            victories++;
+            Restart();
+        }
+    }
+
+    public void KeyDown(KeyboardEventArgs keyboardEventArgs)
+    {
+        keys.Add(keyboardEventArgs.Key);
+        foreach (string key in keys)
+        {
+            switch (key)
+            {
+                case "ArrowUp":
+                    MoveUp();
+                    break;
+                case "ArrowDown":
+                    MoveDown();
+                    break;
+                case "ArrowRight":
+                    MoveRight();
+                    break;
+                case "ArrowLeft":
+                    MoveLeft();
+                    break;
+                case " ":
+                    Restart();
+                    break;
+            }
+        }
+    }
+
+    public void MoveUp()
+    {
+        var topCollisons = shapes.Where(s => s != player).Where(s =>
+               s.y + DELTA > player.y + player.height &&
+               s.x + s.width > player.x &&
+               s.x < player.x + player.width &&
+               s.y == player.y + player.height
+           ).ToList();
+        if (topCollisons.Count() > 0)
+        {
+            player.speedY = -2;
+        }
+    }
+
+    public void MoveDown()
+    {
+        player.speedY = 2;
+    }
+
+    public void MoveRight()
+    {
+        player.speedX = 1.5;
+    }
+
+    public void MoveLeft()
+    {
+        player.speedX = -1.5;
+    }
+
+
+    public void KeyUp(KeyboardEventArgs keyboardEventArgs)
+    {
+        keys.RemoveAll(s => s == keyboardEventArgs.Key);
+    }
+
+    public void Restart()
+    {
+        player.x = 450;
+        player.y = 450;
+        player.speedY = 0;
+        player.speedX = 0;
+    }
+
+    public class Shape
+    {
+        public double height { get; set; }
+        public double width { get; set; }
+        public double x { get; set; }
+        public double y { get; set; }
+        public string type { get; set; }
+        public string color { get; set; }
+        public double speedY { get; set; }
+        public double speedX { get; set; }
+    }
+}
